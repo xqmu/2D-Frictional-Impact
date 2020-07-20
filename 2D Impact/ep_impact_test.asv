@@ -1,0 +1,409 @@
+clear all;
+
+%% polygon(object) and elipse(bat) setup
+P=[0 0;0.01 0.03;0.07 0.05;0.07 0;0.05 -0.02; 0 0];
+A  = 0;
+Cx = 0;
+Cy = 0;
+I  = 0;
+for i=1:1:5
+    A=A+(P(i,1)*P(i+1,2)-P(i+1,1)*P(i,2))/2;
+    Cx=Cx+(P(i,1)+P(i+1,1))*(P(i,1)*P(i+1,2)-P(i+1,1)*P(i,2));
+    Cy=Cy+(P(i,2)+P(i+1,2))*(P(i,1)*P(i+1,2)-P(i+1,1)*P(i,2));
+end
+Cx = Cx/6/A;
+Cy = Cy/6/A;
+
+for i=1:1:5
+   I=I+(P(i,1)^2+P(i,2)^2+P(i+1,1)^2+P(i+1,2)^2+P(i,1)*P(i+1,1)+P(i,2)*P(i+1,2))* (P(i,1)*P(i+1,2)-P(i,2)*P(i+1,1))/12; 
+end
+    
+o_o =[Cx  Cy];   
+m_o = 0.180;
+sig_o = m_o*I/A - m_o*norm(o_o)^2; 
+
+a_b = 0.0700;
+b_b = 0.04500;
+m_b = 0.252;
+sig_b = m_b*(a_b^2+b_b^2)/4;
+    
+e = 0.95; 
+
+%% parameters for subplots
+% miu = 0.5;     %<c,r>    (b) 
+miu = 0.95;   %<s,c,r> sticking,  energy example (c) 
+% miu = 0.8;    %<c,s,r> sticking  (e) 
+
+V_o=[-1.52 -2.75];   %for figures  (b), (c), and (e)
+w_o = -30; 
+
+% miu = 0.3;  %<s,c,r> reverse sliding, (d)
+% miu = 0.01;  %<c,s,r> reverse sliding, energy  example , (f)
+%   
+% V_o=[-0 7.5];  %for figures (d) and (f)
+% w_o = -30; 
+
+%% 
+theta = -2.944;
+R  = [cos(theta) -sin(theta);sin(theta) cos(theta)];
+x0 = sqrt(a_b^2*b_b^2/(a_b^2*tan(theta)^2+b_b^2))*tan(-theta)/abs(tan(-theta));
+y0 = x0*tan(-theta);
+l  = sqrt(x0^2+y0^2);
+o_b= [-l 0];
+V_b= [2.345  4.339];
+w_b= 9.011;
+
+p=[0 0];
+
+t_k = -x0*b_b^2/y0/a_b^2;
+t   = (R*[1 t_k]')';
+t   = t/norm(t);
+n   = [-t(2) t(1)];
+
+r_o = p - o_o;
+r   = norm(r_o);
+r_op(1) = -r_o(2);
+r_op(2) = r_o(1); 
+v_o     = V_o + w_o*r_op;
+
+r_b = p - o_b;
+r_bp(1) = -r_b(2);
+r_bp(2) = r_b(1);
+v_b = V_b + w_b*r_bp;
+
+vt_ = (v_o - v_b)*t';
+vn_ = (v_o - v_b)*n'; 
+ 
+  
+if abs(vt_)<=0.00001
+  vt_=0;
+end
+
+if vt_ > 0
+xigma = n - miu*t;
+else
+  if vt_<0
+      xigma = n + miu*t;
+  else
+      xigma=n;    % need to be changed ****************
+  end
+end
+ 
+W= eye(2)*(m_o+m_b)/(m_o*m_b) + (r_op'*r_op) / sig_o + (r_bp'*r_bp) / sig_b;
+
+t_W_xigma = t*W*xigma';
+n_W_xigma = n*W*xigma';
+t_W_n = t*W*n';
+t_W_t = t*W*t';
+n_W_n = n*W*n';
+n_W_t = n*W*t';
+
+if(n_W_n<=miu*abs(n_W_t))
+  disp('not reasonable');
+end
+
+
+if (vt_ == 0)
+Ins = 0;
+else
+  if vt_*t_W_xigma<0
+    Ins = -(vt_) / t_W_xigma;
+  else
+      disp('No Ins');
+  end
+end
+
+    
+if abs(t_W_n) <= miu*t_W_t
+deta = n - (t_W_n / t_W_t)*t;
+else
+  if (vt_ > 0)
+    deta = n + miu*t;  
+  else
+      if vt_<0
+          deta = n - miu*t;
+      else
+          deta=n-miu*(t_W_n/abs(t_W_n))*t;
+      end
+  end
+end
+ 
+if n_W_xigma>0
+ Inc_tuda = -vn_ / n_W_xigma;
+else
+  disp('No Inc_tuda');
+end
+
+n_W_deta = n*W*deta';
+t_W_deta = t*W*deta';
+n_W_xd = n*W*(xigma - deta)';
+f1_Ins = -vn_ * Ins - 0.5*n_W_xigma*Ins*Ins;
+f2_Ins = -vn_*Ins - n_W_xigma*Ins*Ins; 
+
+ 
+if Ins <= Inc_tuda
+    Inc = -(vn_ + n_W_xd*Ins) / n_W_deta;
+     f2_Inc = -vn_*Inc - n_W_xigma*Inc*Ins - 0.5*n_W_deta*(Inc - Ins)*(Inc - Ins);
+
+     c1 = -0.5*n_W_deta;
+     c2 = -(vn_ + n_W_xd*Ins);
+     c3 = (e*e - 1)*f2_Inc + e*e*(f1_Ins - f2_Ins) - 0.5*n_W_deta*Ins*Ins;
+
+    [flag,result]=solveQuadratic(c1, c2, c3);
+
+    if result(1) > result(2)
+        Inr = result(1);
+    else
+        Inr = result(2);
+    end
+
+else 
+Inc = Inc_tuda;
+f1_Inc = -vn_ * Inc - 0.5*n_W_xigma*Inc*Inc;
+c1 = -0.5*n_W_xigma;
+c2 = -(vn_);
+c3 = (e*e - 1)*f1_Inc;
+temp = c1*Ins*Ins + c2*Ins + c3;
+    if temp <= 0
+        [flag,result]=solveQuadratic(c1, c2, c3);
+
+        if result(1) > result(2)
+            Inr = result(1);
+        else
+            Inr = result(2);
+        end
+    else 
+        c1 = -0.5*n_W_deta;
+        c2 = -(vn_ + n_W_xd*Ins);
+        c3 = (e*e - 1)*f1_Inc + f1_Ins - f2_Ins - 0.5*n_W_deta*Ins*Ins;
+
+        [flag,result]=solveQuadratic(c1, c2, c3);
+
+        if (result(1) > Inc)
+            Inr = result(1);
+        else
+                Inr = result(2);
+        end
+    end
+end
+  
+%   Inr = (1+e)*Inc; 
+
+if Ins<Inr
+  Ir=Ins*xigma+(Inr-Ins)*deta;
+else
+  Ir=Inr*xigma;
+end
+
+
+v_plus=V_o+Ir/m_o;
+w_plus=w_o+(r_o(1)*Ir(2)-r_o(2)*Ir(1))/sig_o;
+
+vb_plus=V_b-Ir/m_b;
+wb_plus=w_b-(r_b(1)*Ir(2)-r_b(2)*Ir(1))/sig_b;
+  
+%   keb_ = 0.5*m_b*norm(V_b,2)^2     + 0.5*sig_b*w_b^2 ;
+%   keb  = 0.5*m_b*norm(vb_plus,2)^2 + 0.5*sig_b*wb_plus^2;
+%   keo_ = 0.5*m_o*norm(V_o,2)^2     + 0.5*sig_o*w_o^2 ;
+%   keo  = 0.5*m_o*norm(v_plus,2)^2  + 0.5*sig_o*w_plus^2 ;
+%   keb_ + keo_ 
+%   keb  + keo
+   
+%   step = Ins/1000; 
+%   E_loss = 0; 
+%   for i=1:1:1000
+%       In = i*step; 
+%       It = In*(xigma-n)/t;
+%       vt = vt_+ t_W_xigma*In; 
+%       E_loss = miu*vt*step; 
+%   end
+
+ %% paraper data for plotting 
+  Inrp = (1+e)*Inc; 
+      figure(7);     
+      if Ins<Inr
+          Its=Ins*(xigma-n)/t;
+          Itr=Ins*(xigma-n)/t+(Inr-Ins)*(deta-n)/t;   
+          Itrp = Ins*(xigma-n)/t+(Inrp-Ins)*(deta-n)/t;
+      else
+          Itr=Inr*(xigma-n)/t;                        
+          Itrp = Inrp*(xigma-n)/t;
+      end
+      if Ins<Inc_tuda
+         Itc=Ins*(xigma-n)/t+(Inc-Ins)*(deta-n)/t;
+      else
+         Itc=Inc*(xigma-n)/t;
+      end 
+      
+      
+      if Ins<Inr
+          vts=vt_+t_W_xigma*Ins;
+          if abs(t_W_n)>miu*t_W_t
+              vtr=t_W_deta*(Inr-Ins);           
+              vtrp = t_W_deta*(Inrp-Ins);
+              if Inc<Ins
+                  vtc=vt_+t_W_xigma*Inc;
+              else
+                  vtc=t_W_deta*(Inc-Ins);
+              end
+          else 
+              vtr=0;                             
+              vtrp = 0; 
+              if Inc<Ins
+                  vtc=vt_+t_W_xigma*Inc;
+              else
+                  vtc=0;
+              end
+          end
+      else
+          vtr=vt_+t_W_xigma*Inr;                
+          vtrp=vt_+t_W_xigma*Inrp;
+          vtc=vt_+t_W_xigma*Inc;
+      end
+      
+% %%  figure(b)
+%       yyaxis left; 
+%       plot([0 Inr], [0 Itr]);
+%       hold on; 
+%       plot(Inc, Itc,'o','MarkerSize',2,'MarkerFaceColor','b'); 
+%       
+%       yyaxis right; 
+%       plot([0 Inr], [vt_ vtr]);
+%       hold on; 
+%       plot(Inc, vtc,'o','MarkerSize',2,'MarkerFaceColor','b'); 
+      
+%% figure (c) (d) (e) (f)
+      yyaxis left; 
+      plot([0 Ins], [0 Its]);
+      hold on; 
+      plot([Ins Inr], [Its Itr]);      
+      %plot([Inr Inrp], [Itr Itrp]); 
+      
+      plot(Inc, Itc,'o','MarkerSize',2,'MarkerFaceColor','b'); 
+      plot(Ins, Its,'o','MarkerSize',2,'MarkerFaceColor','r'); 
+%       plot(Inr, Itr,'o','MarkerSize',2,'MarkerFaceColor','g');
+      
+      yyaxis right; 
+      plot([0 Ins], [vt_ vts]);
+      hold on; 
+      plot([Ins Inr], [vts vtr]);       
+      %plot([Inr Inrp], [vtr, vtrp]); 
+      
+      plot(Inc, vtc,'o','MarkerSize',2,'MarkerFaceColor','b');
+      plot(Ins, vts,'o','MarkerSize',2,'MarkerFaceColor','r'); 
+%       plot(Inr, vtr,'o','MarkerSize',2,'MarkerFaceColor','g'); 
+
+
+% % 0.5*(1- e^2) * (vn_ + n_W_xd*Ins)^2 / n_W_deta + 0.5*n_W_xd*Ins^2 ;
+
+%% plot potential energy
+% 
+% figure(8); 
+% if Ins > Inc
+%     step1 = Inc/100; 
+%     E1 = zeros(1,100); 
+%     In1 = zeros(1,100); 
+%     step2 = (Ins-Inc)/100; 
+%     Es2 = zeros(1,100); 
+%     Ep2 = zeros(1,100);
+%     In2 = zeros(1,100); 
+%     
+%     
+%     steps = (Inr - Ins)/100; 
+%     stepp = (Inrp - Ins)/100;
+%     In_s = zeros(1,100); 
+%     In_p = zeros(1,100); 
+%     Es3  = zeros(1,100); 
+%     Ep3  = zeros(1,100); 
+% 
+%     f1_Inc = -vn_*Inc - 0.5*n_W_deta*Inc^2;
+%     for i=1:1:100
+%         In1(i) = i*step1; 
+%         E1(i) = -vn_*In1(i) - 0.5*n_W_xigma*In1(i)^2; 
+% 
+%         In2(i) = Inc + i*step2; 
+%         Es2(i) = -vn_*In2(i) - 0.5*n_W_xigma*In2(i)^2 +(e^2-1)*f1_Inc;
+%         Ep2(i) = -vn_*In2(i) - 0.5*n_W_xigma*In2(i)^2; -vn_*In2(i) - n_W_xigma*Ins*In2(i) - 0.5*n_W_deta*(In2(i) - Ins)^2 + f1_Ins - f2_Ins;
+%         
+%         
+%         In_s(i) = Ins + i*steps; 
+%         Es3(i) = -vn_*In_s(i) - n_W_xigma*Ins*In_s(i) - 0.5*n_W_deta*(In_s(i) - Ins)^2 ...
+%                    + (e^2 -1)*f1_Inc + f1_Ins - f2_Ins;
+% 
+%         In_p(i) = Ins + i*stepp; 
+%         Ep3(i) = -vn_*In_p(i) - n_W_xigma*Ins*In_p(i) - 0.5*n_W_deta*(In_p(i) - Ins)^2 ...
+%                +f1_Ins - f2_Ins; 
+%     end 
+%     plot(In1, E1, '-'); 
+%     hold on; 
+%     plot(In2,Es2,'-'); 
+%     plot(In2,Ep2,'-'); 
+%     plot(In_s, Es3,'-'); 
+%     plot(In_p, Ep3,'-'); 
+% else
+%     step1 = Ins/100; 
+%     E1 = zeros(1,100); 
+%     In1 = zeros(1,100); 
+%     step2 = (Inc-Ins)/100; 
+%     E2 = zeros(1,100); 
+%     In2 = zeros(1,100); 
+%     steps = (Inr - Inc)/100; 
+%     stepp = (Inrp - Inc)/100;
+%     In_s = zeros(1,100); 
+%     In_p = zeros(1,100); 
+%     Es  = zeros(1,100); 
+%     Ep  = zeros(1,100); 
+% 
+%     f1_Inc = -vn_*Inc - 0.5*n_W_deta*Inc^2;
+%     for i=1:1:100
+%         In1(i) = i*step1; 
+%         E1(i) = -vn_*In1(i) - 0.5*n_W_xigma*In1(i)^2; 
+% 
+%         In2(i) = Ins + i*step2; 
+%         E2(i) = -vn_*In2(i) - n_W_xigma*Ins*In2(i) - 0.5*n_W_deta*(In2(i) - Ins)^2 + f1_Ins - f2_Ins; 
+%         
+%         
+%         In_s(i) = Inc + i*steps; 
+%         Es(i) = -vn_*In_s(i) - n_W_xigma*Ins*In_s(i) - 0.5*n_W_deta*(In_s(i) - Ins)^2 ...
+%                    + (e^2 -1)*f2_Inc + e^2*(f1_Ins - f2_Ins);
+%       
+% 
+%         In_p(i) = Inc + i*stepp; 
+%         Ep(i) = -vn_*In_p(i) - n_W_xigma*Ins*In_p(i) - 0.5*n_W_deta*(In_p(i) - Ins)^2 ...
+%                +f1_Ins - f2_Ins; 
+%     end 
+%     plot(In1, E1, '-'); 
+%     hold on; 
+%     plot(In2,E2,'-'); 
+%     plot(In_s, Es,'-'); 
+%     plot(In_p, Ep,'.'); 
+% end
+
+function [flag, result ] = solveQuadratic( c1,c2,c3 )
+temp=c2*c2-4*c1*c3;
+if temp<0
+    flag=-1;
+    result(1)=0;
+    result(2)=0;
+else
+    flag=1;
+    result(1)=(-c2+sqrt(temp))/2/c1;
+    result(2)=(-c2-sqrt(temp))/2/c1;
+end
+
+end
+
+% %     miu = 0.0531; % for figure (b)
+% %     miu = 0.531;  % for figure (c)
+% %     miu = 0.831;  % for figure (e) 
+% %     miu = 0.003;  % for figure (d) 
+% %     miu = 0.015;  % for figure (f) 
+%    
+%     miu =0.831 ; 
+% %     V_o=[1.52 -2.75];    %for figure(b) (c) and (e) 
+% %     w_o = -19.1348;  
+%     V_o=[1.52 -2.75];
+%     w_o =-300; 
+% 
+% %     V_o=[-9.52 -1.75];   %for figure(d) and (f) 
+% %     w_o = -39.1348; 
